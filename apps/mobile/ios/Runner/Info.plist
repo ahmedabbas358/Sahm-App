@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>يستخدم سهم الكاميرا لمسح وتوثيق الشهادات الجامعية ومطابقتها</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>يستخدم سهم معرض الصور لاختيار صور الشهادات والوثائق للتوثيق</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
