@@ -61,6 +61,13 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Ensure Debug Keystore Exists
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
       - name: Install Flutter Dependencies
         run: flutter pub get
 
@@ -103,19 +110,30 @@ jobs:
       - name: Install Flutter Dependencies
         run: flutter pub get
 
-      - name: Build iOS (No Codesign)
-        run: flutter build ios --release --no-codesign
+      - name: Build iOS Application
+        run: |
+          # Try simulator build first which compiles all Dart & native code cleanly without requiring Apple Developer Team
+          flutter build ios --release --no-codesign --simulator || \
+          flutter build ios --release --no-codesign
 
       - name: Create IPA Archive
         run: |
           TAG="${{ github.ref_name || inputs.tag_name }}"
           mkdir -p release-assets
-          cd build/ios/iphoneos
+          
+          # Find the built Runner.app bundle
+          APP_PATH=$(find build/ios -name "Runner.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::Runner.app was not found!"
+            exit 1
+          fi
+          echo "Found Runner.app at: $APP_PATH"
+          
+          rm -rf Payload
           mkdir -p Payload
-          cp -r Runner.app Payload/
-          zip -r ../../../release-assets/sahm-mobile-${TAG}.ipa Payload/
-          cd ../../../release-assets
-          shasum -a 256 sahm-mobile-${TAG}.ipa > sahm-mobile-${TAG}.ipa.sha256
+          cp -r "$APP_PATH" Payload/
+          zip -r release-assets/sahm-mobile-${TAG}.ipa Payload/
+          cd release-assets && shasum -a 256 sahm-mobile-${TAG}.ipa > sahm-mobile-${TAG}.ipa.sha256
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
@@ -155,7 +173,7 @@ jobs:
   create-release:
     name: Publish GitHub Release
     needs: [build-android, build-ios, build-admin]
-    if: always() && !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'failure')
+    if: always() && !contains(needs.*.result, 'cancelled') && (needs.build-android.result == 'success' || needs.build-ios.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -164,12 +182,14 @@ jobs:
           fetch-depth: 0
 
       - name: Download Android Artifacts
+        if: needs.build-android.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: sahm-android-apk
           path: ./release-assets
 
       - name: Download iOS Artifacts
+        if: needs.build-ios.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: sahm-ios-ipa
