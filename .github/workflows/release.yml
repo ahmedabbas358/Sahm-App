@@ -65,7 +65,7 @@ jobs:
         run: flutter pub get
 
       - name: Build APK (Release)
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Rename & Prepare APK
         run: |
