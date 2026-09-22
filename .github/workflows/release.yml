@@ -112,9 +112,23 @@ jobs:
 
       - name: Build iOS Application
         run: |
-          # Try simulator build first which compiles all Dart & native code cleanly without requiring Apple Developer Team
-          flutter build ios --release --no-codesign --simulator || \
-          flutter build ios --release --no-codesign
+          # Configure the project without building
+          flutter build ios --release --config-only --no-codesign
+          
+          # Build with xcodebuild directly, disabling code signing entirely
+          cd ios
+          xcodebuild \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            build \
+            SYMROOT="${PWD}/../build/ios/Release-iphoneos-xcodebuild"
 
       - name: Create IPA Archive
         run: |

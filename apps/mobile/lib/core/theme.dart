@@ -114,6 +114,38 @@ class SahmRadius {
 }
 
 // ============================================================================
+// CONVENIENCE ALIASES (used by feature screens)
+// ============================================================================
+
+/// Alias for [SahmSpacing] — allows `AppSpacing.md` in widget code.
+class AppSpacing {
+  AppSpacing._();
+
+  static const double xs = SahmSpacing.xs;
+  static const double sm = SahmSpacing.sm;
+  static const double md = SahmSpacing.md;
+  static const double base = SahmSpacing.base;
+  static const double lg = SahmSpacing.lg;
+  static const double xl = SahmSpacing.xl;
+  static const double xxl = SahmSpacing.xxl;
+  static const double xxxl = SahmSpacing.xxxl;
+  static const double huge = SahmSpacing.huge;
+}
+
+/// Alias for [SahmRadius] — allows `AppRadius.lg` in widget code.
+class AppRadius {
+  AppRadius._();
+
+  static const double xs = SahmRadius.xs;
+  static const double sm = SahmRadius.sm;
+  static const double md = SahmRadius.md;
+  static const double lg = SahmRadius.lg;
+  static const double xl = SahmRadius.xl;
+  static const double xxl = SahmRadius.xxl;
+  static const double full = SahmRadius.full;
+}
+
+// ============================================================================
 // TYPOGRAPHY
 // ============================================================================
 

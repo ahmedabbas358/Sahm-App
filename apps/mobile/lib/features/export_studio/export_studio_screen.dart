@@ -311,7 +311,7 @@ class _ExportStudioScreenState extends State<ExportStudioScreen> {
 
             // Recent Exports Section
             Row(
-              mainAxisAlignment: MainAxisAlignment.between,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'سجل التصدير الأخير (Export Center)',
