@@ -36,9 +36,9 @@ jobs:
           fi
 
   # -------------------------------------------------------------
-  # Job 2: Build Mobile APK (Release Artifact)
+  # Job 2: Build Android APK (Release Artifact)
   # -------------------------------------------------------------
-  build-mobile:
+  build-android:
     name: Build Android APK
     needs: preflight
     runs-on: ubuntu-latest
@@ -58,8 +58,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
-          channel: 'stable'
+          channel: stable
           cache: true
 
       - name: Install Flutter Dependencies
@@ -71,19 +70,61 @@ jobs:
       - name: Rename & Prepare APK
         run: |
           TAG="${{ github.ref_name || inputs.tag_name }}"
-          cp build/app/outputs/flutter-apk/app-release.apk ../../sahm-mobile-${TAG}.apk
-          sha256sum ../../sahm-mobile-${TAG}.apk > ../../sahm-mobile-${TAG}.apk.sha256
+          mkdir -p release-assets
+          cp build/app/outputs/flutter-apk/app-release.apk release-assets/sahm-mobile-${TAG}.apk
+          cd release-assets && sha256sum sahm-mobile-${TAG}.apk > sahm-mobile-${TAG}.apk.sha256
 
       - name: Upload Mobile Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sahm-mobile-apk
-          path: |
-            sahm-mobile-*.apk
-            sahm-mobile-*.apk.sha256
+          name: sahm-android-apk
+          path: apps/mobile/release-assets/
 
   # -------------------------------------------------------------
-  # Job 3: Build & Package Admin Dashboard
+  # Job 3: Build iOS IPA (Release Artifact)
+  # -------------------------------------------------------------
+  build-ios:
+    name: Build iOS IPA
+    needs: preflight
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build iOS (No Codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Create IPA Archive
+        run: |
+          TAG="${{ github.ref_name || inputs.tag_name }}"
+          mkdir -p release-assets
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../release-assets/sahm-mobile-${TAG}.ipa Payload/
+          cd ../../../release-assets
+          shasum -a 256 sahm-mobile-${TAG}.ipa > sahm-mobile-${TAG}.ipa.sha256
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sahm-ios-ipa
+          path: apps/mobile/release-assets/
+
+  # -------------------------------------------------------------
+  # Job 4: Build & Package Admin Dashboard
   # -------------------------------------------------------------
   build-admin:
     name: Build Admin Web Bundle
@@ -102,22 +143,17 @@ jobs:
           node-version: '20'
 
       - name: Install Dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm ci || npm install
 
       - name: Build Admin Panel
         run: npm run build
 
   # -------------------------------------------------------------
-  # Job 4: Create GitHub Release with Assets
+  # Job 5: Create GitHub Release with Assets
   # -------------------------------------------------------------
   create-release:
     name: Publish GitHub Release
-    needs: [build-mobile, build-admin]
+    needs: [build-android, build-ios, build-admin]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -125,11 +161,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download Mobile Artifacts
+      - name: Download Android Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: sahm-mobile-apk
+          name: sahm-android-apk
           path: ./release-assets
+
+      - name: Download iOS Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sahm-ios-ipa
+          path: ./release-assets
+
+      - name: List Release Assets
+        run: ls -la ./release-assets/
 
       - name: Extract Release Notes from CHANGELOG
         id: notes
@@ -166,7 +211,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            release-assets/sahm-mobile-*.apk
-            release-assets/sahm-mobile-*.apk.sha256
+            release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
