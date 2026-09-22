@@ -1,0 +1,172 @@
+name: Sahm Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name to release (e.g. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # -------------------------------------------------------------
+  # Job 1: Verification & Pre-flight Checks
+  # -------------------------------------------------------------
+  preflight:
+    name: Pre-flight Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Verify Tag Format
+        run: |
+          TAG="${{ github.ref_name || inputs.tag_name }}"
+          echo "Releasing version: $TAG"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::Tag format must follow semantic versioning, e.g. v0.1.0"
+            exit 1
+          fi
+
+  # -------------------------------------------------------------
+  # Job 2: Build Mobile APK (Release Artifact)
+  # -------------------------------------------------------------
+  build-mobile:
+    name: Build Android APK
+    needs: preflight
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build APK (Release)
+        run: flutter build apk --release
+
+      - name: Rename & Prepare APK
+        run: |
+          TAG="${{ github.ref_name || inputs.tag_name }}"
+          cp build/app/outputs/flutter-apk/app-release.apk ../../sahm-mobile-${TAG}.apk
+          sha256sum ../../sahm-mobile-${TAG}.apk > ../../sahm-mobile-${TAG}.apk.sha256
+
+      - name: Upload Mobile Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sahm-mobile-apk
+          path: |
+            sahm-mobile-*.apk
+            sahm-mobile-*.apk.sha256
+
+  # -------------------------------------------------------------
+  # Job 3: Build & Package Admin Dashboard
+  # -------------------------------------------------------------
+  build-admin:
+    name: Build Admin Web Bundle
+    needs: preflight
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build Admin Panel
+        run: npm run build
+
+  # -------------------------------------------------------------
+  # Job 4: Create GitHub Release with Assets
+  # -------------------------------------------------------------
+  create-release:
+    name: Publish GitHub Release
+    needs: [build-mobile, build-admin]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Mobile Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sahm-mobile-apk
+          path: ./release-assets
+
+      - name: Extract Release Notes from CHANGELOG
+        id: notes
+        run: |
+          TAG="${{ github.ref_name || inputs.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "Extracting release notes for version: $VERSION"
+          
+          # Try to extract the section for this version from CHANGELOG.md
+          if [ -f CHANGELOG.md ]; then
+            python3 -c "
+          import re, sys
+          with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
+              content = f.read()
+          pattern = r'## \[' + re.escape('$VERSION') + r'\][^\n]*\n(.*?)(?=\n## \[|\Z)'
+          match = re.search(pattern, content, re.DOTALL)
+          if match:
+              with open('RELEASE_NOTES.md', 'w', encoding='utf-8') as out:
+                  out.write(match.group(1).strip())
+          else:
+              with open('RELEASE_NOTES.md', 'w', encoding='utf-8') as out:
+                  out.write('### سهم (Sahm) الإصدار ' + '$TAG\n\nإصدار معتمد للإنتاج يتضمن كافة الأنظمة وحزم الأمان.')
+          "
+          else
+            echo "سهم (Sahm) Release $TAG" > RELEASE_NOTES.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || inputs.tag_name }}
+          name: "سهم — Sahm Release ${{ github.ref_name || inputs.tag_name }}"
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            release-assets/sahm-mobile-*.apk
+            release-assets/sahm-mobile-*.apk.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

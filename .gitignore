@@ -1,0 +1,92 @@
+# ===========================
+# Sahm Monorepo .gitignore
+# ===========================
+
+# ----- OS -----
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# ----- IDEs -----
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# ----- Flutter / Dart -----
+apps/mobile/.dart_tool/
+apps/mobile/.packages
+apps/mobile/build/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.pub-cache/
+apps/mobile/.pub/
+# pubspec.lock — committed for Flutter apps (reproducible builds)
+**/*.g.dart
+**/*.freezed.dart
+**/*.gr.dart
+**/*.mocks.dart
+
+# ----- Python / FastAPI -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+apps/backend/venv/
+apps/backend/.venv/
+apps/backend/env/
+apps/backend/.env
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ----- Node.js / Next.js -----
+node_modules/
+apps/admin/.next/
+apps/admin/out/
+apps/admin/.env
+apps/admin/.env.local
+apps/admin/.env.production
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ----- Docker -----
+docker-compose.override.yml
+
+# ----- Environment & Secrets -----
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+secrets/
+
+# ----- Database -----
+*.sqlite
+*.sqlite3
+*.db
+
+# ----- Uploads & Generated -----
+uploads/
+exports/
+temp/

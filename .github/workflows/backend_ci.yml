@@ -1,0 +1,62 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/backend/**'
+      - '.github/workflows/backend_ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/backend/**'
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sahm_test
+          POSTGRES_USER: sahm_user
+          POSTGRES_PASSWORD: sahm_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint with Ruff
+        run: ruff check .
+
+      - name: Format check with Ruff
+        run: ruff format --check .
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://sahm_user:sahm_test_password@localhost:5432/sahm_test
+          SECRET_KEY: test-secret-key
+        run: pytest -v --tb=short
